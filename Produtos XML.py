@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 def ler_xml_prod_receita(nota):
     with open(nota, 'rb') as arquivo:
-        documento = xmltodict.parse(arquivo)
+        documento = xmltodict.parse(arquivo, encoding = 'ANSI')
     dic_nota = documento['NFeLog']['procNFe']['NFe']['infNFe']
     chave = dic_nota['@Id'][3:]
     nf = dic_nota['ide']['nNF']
@@ -18,6 +18,29 @@ def ler_xml_prod_receita(nota):
     desconto_total = float(tot['vDesc'])
     frete_total = float(tot['vFrete'])
     ipi_total = float(tot['vIPI'])
+
+    if 'eveNFe' in documento['NFeLog']:
+        try:
+            dic_evento = documento['NFeLog']['eveNFe']
+            cancelamento_r = 'Não houve'
+            for evento in dic_evento:
+                eventos = evento['evento']['infEvento']['tpEvento']
+                if '110111' in eventos:
+                    cancelamento_r = 'Nota Cancelada'
+                else:
+                    cancelamento = 'Não houve'
+                if cancelamento_r != 'Não houve':
+                    cancelamento = cancelamento_r
+        except:
+            dic_evento = documento['NFeLog']['eveNFe']
+            evento_unico = dic_evento['evento']['infEvento']['tpEvento']
+            if '110111' in str(evento_unico):
+                cancelamento = 'Nota Cancelada'
+            else:
+                cancelamento = 'Não houve'
+    else:
+        cancelamento = 'Não houve'
+
     lista_produtos = []
     try:
         for i, produto in enumerate(produtos):
@@ -27,11 +50,17 @@ def ler_xml_prod_receita(nota):
             valor_unit = float(produto['prod']['vUnCom'])
             valor_produto = float(produto['prod']['vProd'])
             if desconto_total != 0.00:
-                desconto = float(produto['prod']['vDesc'])
+                if 'vDesc' in produto['prod']:
+                    desconto = float(produto['prod']['vDesc'])
+                else:
+                    desconto = 0.00
             else:
                 desconto = float(desconto_total)
             if frete_total != 0.00:
-                frete = float(produto['prod']['vFrete'])
+                if 'vFrete' in produto['prod']:
+                    frete = float(produto['prod']['vFrete'])
+                else:
+                    frete = 0.00
             else:
                 frete = float(frete_total)
             if ipi_total != 0.00:
@@ -100,7 +129,10 @@ def ler_xml_prod_receita(nota):
                     origem = str(produto['imposto']['ICMS']['ICMS40']['orig'])
 
                 elif 'ICMS51' in mod_icms:
-                    icms = produto['imposto']['ICMS']['ICMS51']['vICMS']
+                    if 'vICMS' in produto['imposto']['ICMS']['ICMS51']:
+                        icms = produto['imposto']['ICMS']['ICMS51']['vICMS']
+                    else:
+                        icms = 0.00
                     icms_st = 0.00
                     cst_icms = str(produto['imposto']['ICMS']['ICMS51']['CST'])
                     origem = str(produto['imposto']['ICMS']['ICMS51']['orig'])
@@ -207,6 +239,7 @@ def ler_xml_prod_receita(nota):
                 'CST Pis/Cofins': str(cst_pis),
                 'NCM': str(ncm_produto),
                 'CFOP': str(cfop_produto),
+                'Cancelamento': cancelamento,
             }
             lista_produtos.append(produtos_receita)
     except:
@@ -288,7 +321,10 @@ def ler_xml_prod_receita(nota):
                 origem = str(produtos['imposto']['ICMS']['ICMS40']['orig'])
 
             elif 'ICMS51' in mod_icms:
-                icms = produtos['imposto']['ICMS']['ICMS51']['vICMS']
+                if 'vICMS' in produtos['imposto']['ICMS']['ICMS51']:
+                    icms = produtos['imposto']['ICMS']['ICMS51']['vICMS']
+                else:
+                    icms = 0.00
                 icms_st = 0.00
                 cst_icms = str(produtos['imposto']['ICMS']['ICMS51']['CST'])
                 origem = str(produtos['imposto']['ICMS']['ICMS51']['orig'])
@@ -395,6 +431,7 @@ def ler_xml_prod_receita(nota):
             'CST Pis/Cofins': str(cst_pis),
             'NCM': str(ncm_produto),
             'CFOP': str(cfop_produto),
+            'Cancelamento': cancelamento,
         }
         lista_produtos.append(produtos_receita)
     return lista_produtos
@@ -413,6 +450,7 @@ def ler_xml_prod(nota):
         desconto_total = float(tot['vDesc'])
         frete_total = float(tot['vFrete'])
         ipi_total = float(tot['vIPI'])
+        cancelamento = 'Não possui info no XML'
         try:
             for i, produto in enumerate(produtos):
                 item = i + 1
@@ -422,13 +460,19 @@ def ler_xml_prod(nota):
                 valor_produto = float(produto['prod']['vProd'])
 
                 if desconto_total != 0.00:
-                    desconto = float(produto['prod']['vDesc'])
+                    if 'vDesc' in produto['prod']:
+                        desconto = float(produto['prod']['vDesc'])
+                    else:
+                        desconto = 0.00
                 else:
-                    desconto = desconto_total
+                    desconto = float(desconto_total)
                 if frete_total != 0.00:
-                    frete = float(produto['prod']['vFrete'])
+                    if 'vFrete' in produto['prod']:
+                        frete = float(produto['prod']['vFrete'])
+                    else:
+                        frete = 0.00
                 else:
-                    frete = frete_total
+                    frete = float(frete_total)
                 if ipi_total != 0.00:
                     mod_ipi = produto['imposto']['IPI']
                     if 'IPITrib' in mod_ipi:
@@ -436,7 +480,7 @@ def ler_xml_prod(nota):
                     else:
                         ipi = 0.00
                 else:
-                    ipi = ipi_total
+                    ipi = float(ipi_total)
 
                 ncm_produto = produto['prod']['NCM']
                 cfop_produto = produto['prod']['CFOP']
@@ -495,7 +539,10 @@ def ler_xml_prod(nota):
                         origem = str(produto['imposto']['ICMS']['ICMS40']['orig'])
 
                     elif 'ICMS51' in mod_icms:
-                        icms = produto['imposto']['ICMS']['ICMS51']['vICMS']
+                        if 'vICMS' in produto['imposto']['ICMS']['ICMS51']:
+                            icms = produto['imposto']['ICMS']['ICMS51']['vICMS']
+                        else:
+                            icms = 0.00
                         icms_st = 0.00
                         cst_icms = str(produto['imposto']['ICMS']['ICMS51']['CST'])
                         origem = str(produto['imposto']['ICMS']['ICMS51']['orig'])
@@ -602,6 +649,7 @@ def ler_xml_prod(nota):
                     'CST Pis/Cofins': str(cst_pis),
                     'NCM': str(ncm_produto),
                     'CFOP': str(cfop_produto),
+                    'Cancelamento': cancelamento,
                 }
                 lista_produtos.append(produtos_receita)
         except:
@@ -684,7 +732,10 @@ def ler_xml_prod(nota):
                     origem = str(produtos['imposto']['ICMS']['ICMS40']['orig'])
 
                 elif 'ICMS51' in mod_icms:
-                    icms = produtos['imposto']['ICMS']['ICMS51']['vICMS']
+                    if 'vICMS' in produtos['imposto']['ICMS']['ICMS51']:
+                        icms = produtos['imposto']['ICMS']['ICMS51']['vICMS']
+                    else:
+                        icms = 0.00
                     icms_st = 0.00
                     cst_icms = str(produtos['imposto']['ICMS']['ICMS51']['CST'])
                     origem = str(produtos['imposto']['ICMS']['ICMS51']['orig'])
@@ -791,6 +842,7 @@ def ler_xml_prod(nota):
                 'CST Pis/Cofins': str(cst_pis),
                 'NCM': str(ncm_produto),
                 'CFOP': str(cfop_produto),
+                'Cancelamento': cancelamento,
             }
             lista_produtos.append(produtos_nfe)
     else:
@@ -814,6 +866,7 @@ def ler_xml_prod(nota):
             'CST Pis/Cofins': 'Verificar se não está denegada',
             'NCM': 'Verificar se não está denegada',
             'CFOP': 'Verificar se não está denegada',
+            'Cancelamento': 'Verificar se não está denegada',
         }
         lista_produtos.append(produtos_nfe)
 
@@ -884,13 +937,61 @@ for arquivo in lista_arquivos:
         lista_arquivos_xml.append(arquivo)
 
 for nota in tqdm(lista_arquivos_xml):
-    with open(f'{caminho}/{nota}', 'rb') as arquivo:
-        documento = xmltodict.parse(arquivo)
+    try:
+        with open(f'{caminho}/{nota}', 'rb') as arquivo:
+            documento = xmltodict.parse(arquivo)
         if 'procInutNFe' in documento:
             pass
         elif 'ProcInutNFe' in documento:
             pass
+        elif 'retInutNFe' in documento:
+            pass
+        elif 'inutNFe' in documento:
+            pass
         elif 'procEventoNFe' in documento:
+            pass
+        elif 'procEventoCTe' in documento:
+            pass
+        elif 'retEnvEvento' in documento:
+            pass
+        elif 'resEvento' in documento:
+            pass
+        elif 'cteProc' in documento:
+            pass
+        elif 'NFe' in documento:
+            lista_prov = ler_xml_prod(f'{caminho}/{nota}')
+            for item in lista_prov:
+                lista_produtos_dic.append(item)
+        elif 'NFeLog' in documento:
+            lista_prov = ler_xml_prod_receita(f'{caminho}/{nota}')
+            for item in lista_prov:
+                lista_produtos_dic.append(item)
+        elif documento['nfeProc']['NFe']['infNFe']['ide']['mod'] == '55':
+            lista_prov = ler_xml_prod(f'{caminho}/{nota}')
+            for item in lista_prov:
+                lista_produtos_dic.append(item)
+        else:
+            lista_prov = ler_xml_prod_nfce(f'{caminho}/{nota}')
+            for item in lista_prov:
+                lista_nfce_dic.append(item)
+    except:
+        with open(f'{caminho}/{nota}', 'rb') as arquivo:
+            documento = xmltodict.parse(arquivo, encoding = 'ANSI')
+        if 'procInutNFe' in documento:
+            pass
+        elif 'ProcInutNFe' in documento:
+            pass
+        elif 'retInutNFe' in documento:
+            pass
+        elif 'inutNFe' in documento:
+            pass
+        elif 'procEventoNFe' in documento:
+            pass
+        elif 'procEventoCTe' in documento:
+            pass
+        elif 'retEnvEvento' in documento:
+            pass
+        elif 'resEvento' in documento:
             pass
         elif 'cteProc' in documento:
             pass
